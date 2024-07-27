@@ -92,8 +92,7 @@ This guide outlines the steps to set up a Jenkins CI/CD pipeline to build, push,
            }
        }
      }
-   ```
-
+     ```
 4. **Configure Jenkins Credentials**:
    - **GitHub Credentials**:
      - Go to Jenkins Dashboard → Manage Jenkins → Manage Credentials.
