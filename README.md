@@ -91,8 +91,7 @@ This guide outlines the steps to set up a Jenkins CI/CD pipeline to build, push,
             cleanWs()
         }
     }
-}
-     ```
+}```
 
 3. **Configure Jenkins Credentials**:
    - **GitHub Credentials**:
