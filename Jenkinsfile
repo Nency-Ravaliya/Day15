@@ -1,91 +1,67 @@
 pipeline {
     agent any
-
-    tools {
-        jdk 'JDK 17' // Make sure this name matches what you configured
-        maven 'Maven-3.9.2' // Ensure this matches the name configured for Maven
-    }
-
     environment {
-        MAVEN_HOME = tool name: 'Maven-3.9.2', type: 'maven'
-        JAVA_HOME = tool name: 'JDK 17', type: 'jdk'
+        // DockerHub credentials
+        DOCKER_CREDENTIALS_ID = 'nensiravaliya28'
+        // DockerHub repository
+        DOCKER_REPO = 'nensiravaliya28/java-app'
+        // GitHub credentials
+        GIT_CREDENTIALS_ID = 'gtk0'
     }
-
     stages {
-        stage('Checkout') {
+        stage('Clone Repository') {
             steps {
-                git url: 'https://github.com/Nency-Ravaliya/Day14.git', branch: 'main', credentialsId: 'gtk0'
+                git credentialsId: "${GIT_CREDENTIALS_ID}", url: 'https://github.com/Nency-Ravaliya/Day15.git', branch: 'main'
             }
         }
-
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "PATH+JAVA=${JAVA_HOME}/bin"]) {
-                        sh 'mvn clean package'
+                    // Build the Docker image and tag it with BUILD_ID
+                    def image = docker.build("${DOCKER_REPO}:${env.BUILD_ID}")
+                }
+            }
+        }
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    // Push the image with both the BUILD_ID tag and the 'latest' tag
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
+                        def image = docker.image("${DOCKER_REPO}:${env.BUILD_ID}")
+                        image.push("${env.BUILD_ID}") // Push with BUILD_ID tag
+                        image.push('latest') // Optionally, also push with 'latest' tag
                     }
                 }
             }
         }
-
-        stage('Unit Tests') {
+        stage('Deploy Container') {
             steps {
                 script {
-                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "PATH+JAVA=${JAVA_HOME}/bin"]) {
-                        sh 'mvn test'
-                    }
+                    sh """
+                    #!/bin/bash
+                    docker pull ${DOCKER_REPO}:${env.BUILD_ID}
+                    docker stop java-app-container || true
+                    docker rm java-app-container || true
+                    docker run -d --name java-app-container -p 8081:8081 ${DOCKER_REPO}:${env.BUILD_ID}
+                    """
                 }
             }
         }
-
-        stage('Integration Tests') {
+        stage('Print Docker Logs') {
             steps {
                 script {
-                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "PATH+JAVA=${JAVA_HOME}/bin"]) {
-                        sh 'mvn verify'
-                    }
-                }
-            }
-        }
-
-        stage('Static Analysis') {
-            steps {
-                script {
-                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "PATH+JAVA=${JAVA_HOME}/bin"]) {
-                        sh 'mvn pmd:pmd'
-                    }
-                }
-            }
-        }
-
-        stage('Archive Artifacts') {
-            steps {
-                archiveArtifacts artifacts: '**/target/*.jar', allowEmptyArchive: true
-            }
-        }
-
-        stage('Deploy') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    echo "Deploying application from branch: ${env.BRANCH_NAME}"
-                    sh './deploy-prod.sh'
+                    sh """
+                    #!/bin/bash
+                    echo "Fetching logs for java-app-container..."
+                    docker logs java-app-container
+                    """
                 }
             }
         }
     }
-
     post {
         always {
-            echo 'Pipeline finished.'
-        }
-        success {
-            echo 'Pipeline succeeded.'
-        }
-        failure {
-            echo 'Pipeline failed.'
+            cleanWs()
         }
     }
 }
